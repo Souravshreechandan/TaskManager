@@ -30,6 +30,31 @@ router.post("/",async(req, res)=>{
     }
 });
 
+// API to edit a task
+router.put("/:id", async (req, res) => {
+  try {
+    const title = req.body.title?.trim();
+
+    if (!title) {
+      return res.status(400).json({ message: "Enter a task name" });
+    }
+
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { title },
+      { new: true, runValidators: true }
+    );
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 //api to mark complete or undo the task
 router.patch("/:id",async(req,res)=>{
     try {
