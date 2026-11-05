@@ -15,46 +15,80 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState("all");
   const [editingTask, setEditingTask] = useState(null);
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest");
 
-  // Fetch tasks
+  // fetch tasks
   async function getTasks() {
     const res = await fetch(API);
-    setTasks(await res.json());
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch tasks");
+    }
+
+    const data = await res.json();
+    setTasks(data);
   }
 
+  // Load tasks when component mounts
   useEffect(() => {
-    getTasks();
+    getTasks().catch(console.error);
   }, []);
 
-  // API requests
+  // add task
   async function addTask(title) {
-    await fetch(API, {
+    const res = await fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
     });
 
+    if (!res.ok) {
+      throw new Error("Failed to add task");
+    }
+
     await getTasks();
   }
 
+  // edit task
   async function editTask(id, title) {
-    await fetch(`${API}/${id}`, {
+    const res = await fetch(`${API}/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
     });
 
+    if (!res.ok) {
+      throw new Error("Failed to edit task");
+    }
+
     await getTasks();
     setEditingTask(null);
   }
 
+  // complete/undo task
   async function toggleTask(id) {
-    await fetch(`${API}/${id}`, { method: "PATCH" });
+    const res = await fetch(`${API}/${id}`, {
+      method: "PATCH",
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to update task");
+    }
+
     await getTasks();
   }
 
+  // delete task
   async function deleteTask(id) {
-    await fetch(`${API}/${id}`, { method: "DELETE" });
+    const res = await fetch(`${API}/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to delete task");
+    }
+
     await getTasks();
 
     if (editingTask?._id === id) {
@@ -62,15 +96,27 @@ function App() {
     }
   }
 
-  // Filter tasks
-  const filteredTasks = tasks.filter((task) => {
-    if (filter === "pending") return !task.completed;
-    if (filter === "completed") return task.completed;
-    return true;
-  });
+  // search,filter and sort tasks
+  const filteredTasks = tasks
+    .filter((task) =>
+      task.title.toLowerCase().includes(search.toLowerCase().trim())
+    )
+    .filter((task) => {
+      if (filter === "pending") return !task.completed;
+      if (filter === "completed") return task.completed;
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
 
-  // Task counts
-  const getCount = (value) => {
+      return sortOrder === "newest"
+        ? dateB - dateA
+        : dateA - dateB;
+    });
+
+  // task counts
+  function getCount(value) {
     if (value === "pending") {
       return tasks.filter((task) => !task.completed).length;
     }
@@ -80,15 +126,18 @@ function App() {
     }
 
     return tasks.length;
-  };
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-10 sm:px-8">
       <main className="mx-auto max-w-5xl rounded-2xl bg-white p-6 shadow-sm sm:p-10">
+
+        {/* Heading */}
         <h1 className="mb-8 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Task Manager
         </h1>
 
+        {/* Add and Edit Task */}
         <TaskForm
           onAdd={addTask}
           editingTask={editingTask}
@@ -96,11 +145,32 @@ function App() {
           onCancelEdit={() => setEditingTask(null)}
         />
 
+        {/* Search and Sort */}
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+          <input
+            type="text"
+            placeholder="Search tasks by title..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-11 w-full flex-1 rounded-lg border border-slate-300 px-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none focus:border-blue-500"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+          </select>
+        </div>
+
         {/* Task Filters */}
         <div className="mb-6 flex flex-wrap gap-3">
           {FILTERS.map(({ label, value }) => (
             <button
               key={value}
+              type="button"
               onClick={() => setFilter(value)}
               className={`rounded-lg px-5 py-2 text-sm font-medium transition ${
                 filter === value
@@ -113,12 +183,14 @@ function App() {
           ))}
         </div>
 
+        {/* Task List */}
         <TaskList
           tasks={filteredTasks}
           onToggle={toggleTask}
           onDelete={deleteTask}
           onEditClick={setEditingTask}
         />
+
       </main>
     </div>
   );
